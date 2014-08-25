@@ -228,7 +228,7 @@ FETCH NEXT FROM BufferEA INTO @ID, @SubcatID, @EventID, @SmartFilterID, @SmartFi
 WHILE @@FETCH_STATUS = 0
 	BEGIN
 	--Calculate OrderID in target subcat context
-	SELECT @ContextOrderID = MAX(OrderID) + 1 FROM EventsActions WHERE SubcatID = @TargetSubcatID AND EventID = @EventID
+	SELECT @ContextOrderID = ISNULL(MAX(OrderID) + 1, 0) FROM EventsActions WHERE SubcatID = @TargetSubcatID AND EventID = @EventID
 	--Check if global
 	IF @SmartFilterID_new IS NULL AND @SmartFilterID IS NOT NULL
 		SET @SmartFilterID_new = @SmartFilterID
