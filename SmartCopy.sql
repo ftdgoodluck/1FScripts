@@ -3,8 +3,8 @@ DECLARE @TargetSubcatID INT, @SourceSubcatID INT, @SourceActionPackName VARCHAR(
 ------------------------------------------------------------------------------------------------------------------------
 SET @Enable_immediately = 0 --нужно ли сразу включить действие
 SET @SourceSubcatID = 680 -- из какой категории копировать
-SET @TargetSubcatID = 809 -- в какую категорию копировать
-SET @SourceActionPackName = 'название_пакета' --название пакета
+SET @TargetSubcatID = 669 -- в какую категорию копировать
+SET @SourceActionPackName = 'изм штраф' --название пакета
 ------------------------------------------------------------------------------------------------------------------------
 
 DECLARE @BufferSE TABLE
@@ -206,26 +206,26 @@ BEGIN TRY
 ---------------------------------------------------------------------------------------------------------------------------
 --Context logic
 --события - до/после смены ДП
-IF EXISTS(SELECT * FROM @EventsActions WHERE EventID IN (0,1) AND ParameterValue IS NOT NULL)
-	IF ((SELECT ParameterValue FROM @EventsActions WHERE EventID IN(0,1)) EXCEPT (SELECT ExtParamID FROM ExtParamsInSubcat WHERE SubcatID = @TargetSubcatID)) IS NOT NULL
+IF EXISTS(SELECT * FROM @BufferEA WHERE EventID IN (0,1) AND ParameterValue IS NOT NULL)
+	IF ((SELECT ParameterValue FROM @BufferEA WHERE EventID IN(0,1)) EXCEPT (SELECT ExtParamID FROM ExtParamsInSubcat WHERE SubcatID = @TargetSubcatID)) IS NOT NULL
 		RAISERROR('В целевой категории нет параметров, которые используются в событиях. Копирование не произведено', 15, 1)
 		
 --события - до/после перехода
-IF EXISTS(SELECT * FROM @EventsActions WHERE EventID IN (4,5) AND ParameterValue IS NOT NULL)
+IF EXISTS(SELECT * FROM @BufferEA WHERE EventID IN (4,5) AND ParameterValue IS NOT NULL)
 	BEGIN
 		DECLARE EventStepCursor CURSOR FOR
-		SELECT ParameterValue FROM @EventsActions WHERE EventID IN (4,5) AND ParameterValue IS NOT NULL
+		SELECT ParameterValue FROM @BufferEA WHERE EventID IN (4,5) AND ParameterValue IS NOT NULL
 
 		OPEN EventStepCursor
 		FETCH NEXT FROM EventStepCursor INTO @ParameterValue
 		WHILE @@FETCH_STATUS = 0
 			BEGIN
-			SELECT @StepID = TOP 1 StepID FROM StatesRoutesInSubcat
+			SELECT TOP 1 @StepID =  StepID FROM StatesRoutesInSubcat
 			WHERE SubcatID = @TargetSubcatID
-			AND StateID = (SELECT StateID FROM StatesRoutesInSubcat WHERE SubcatID = @TargetSubcatID AND StepID = @ParameterValue)
-			AND StateNextID = (SELECT StateNextID FROM StatesRoutesInSubcat WHERE SubcatID = @TargetSubcatID AND StepID = @ParameterValue)
+			AND StateID = (SELECT StateID FROM StatesRoutesInSubcat WHERE SubcatID = @SourceSubcatID AND StepID = @ParameterValue)
+			AND StateNextID = (SELECT StateNextID FROM StatesRoutesInSubcat WHERE SubcatID = @SourceSubcatID AND StepID = @ParameterValue)
 			IF @StepID IS NOT NULL
-				UPDATE @EventsActions SET ParameterValue = @StepID WHERE CURRENT OF EventStepCursor
+				UPDATE @BufferEA SET ParameterValue = @StepID WHERE CURRENT OF EventStepCursor
 			ELSE
 				RAISERROR('В целевой категории нет переходов, которые используются в событиях. Копирование не произведено', 15, 1)
 
@@ -236,21 +236,21 @@ IF EXISTS(SELECT * FROM @EventsActions WHERE EventID IN (4,5) AND ParameterValue
 	END
 ---------------------------------------------------------------------------------------------------------------------------
 --экшены с ДП
-IF EXISTS(
-		SELECT * 
-			FROM 
-				@BufferPA  bpa 
-				LEFT JOIN @BufferPAP bpap on bpa.ID = bpap.PackActionID
-			WHERE 
-				((bpa.ActionID IN (43,5,26) AND bpap.ParameterOrder = 2)
-				OR (bpa.ActionID = 27 AND bpap.ParameterOrder IN (1,3))
-					AND 
-				bpap.Value IS NOT NULL AND bpap.ExpressionID IS NULL
+--IF EXISTS(
+--		SELECT * 
+--			FROM 
+--				@BufferPA  bpa 
+--				LEFT JOIN @BufferPAP bpap on bpa.ID = bpap.PackActionID
+--			WHERE 
+--				((bpa.ActionID IN (43,5,26) AND bpap.ParameterOrder = 2)
+--				OR (bpa.ActionID = 27 AND bpap.ParameterOrder IN (1,3))
+--					AND 
+--				bpap.Value IS NOT NULL AND bpap.ExpressionID IS NULL
 
-		)
-	BEGIN
-		print '---'
-	END
+--		)
+--	BEGIN
+--		print '---'
+--	END
 
 
 
@@ -409,6 +409,3 @@ BEGIN CATCH
 	PRINT ERROR_MESSAGE()
 
 END CATCH
-
-
-
